@@ -1,0 +1,11 @@
+product_id,sku,product_name,category
+1,SKU001,Prod_1,finished
+2,SKU002,Prod_2,component
+3,SKU003,Prod_3,component
+4,SKU004,Prod_4,component
+5,SKU005,Prod_5,finished
+6,SKU006,Prod_6,finished
+7,SKU007,Prod_7,finished
+8,SKU008,Prod_8,finished
+9,SKU009,Prod_9,finished
+10,SKU010,Prod_10,component
