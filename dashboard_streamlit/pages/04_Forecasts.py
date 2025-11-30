@@ -7,7 +7,8 @@ st.title("📈 7-Day Forecast")
 
 # --- Load data ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-forecast_file = os.path.join(BASE_DIR, "..", "data", "forecast.csv")
+DATA_DIR = os.path.join(BASE_DIR, "..", "..", "data")  # two levels up
+forecast_file = os.path.join(DATA_DIR, "forecast.csv")
 
 @st.cache_data
 def load_data():
