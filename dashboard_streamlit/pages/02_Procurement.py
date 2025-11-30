@@ -1,65 +1,56 @@
-# dashboard_streamlit/pages/02_Procurement.py
-import os
-import pandas as pd
 import streamlit as st
-import plotly.express as px
+import pandas as pd
+import os
 
-st.set_page_config(page_title="Procurement", layout="wide")
-st.title("Procurement & Spend Analysis")
+st.title("💰 Procurement Analytics")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, '..', '..', 'data')
-DELIVERIES_FILE = os.path.join(DATA_DIR, 'deliveries_curated.csv')
+# Load data
+DATA_PATH = os.path.join("data", "deliveries_curated.csv")
+df = pd.read_csv(DATA_PATH)
 
-@st.cache_data
-def load_csv(path):
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return pd.DataFrame()
+# Rename columns to clean names
+df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-df = load_csv(DELIVERIES_FILE)
+# Check for required columns
+required = ["supplier_id", "product_id", "cost_eur"]
+missing = [c for c in required if c not in df.columns]
 
-if df.empty:
-    st.warning("deliveries_curated.csv not found or is empty in data/.")
+if missing:
+    st.error(f"❌ Missing columns: {', '.join(missing)}")
     st.stop()
 
-# detect cost column
-cost_candidates = ['cost', 'cost_eur', 'amount', 'price', 'total', 'spend']
-cost_col = next((c for c in cost_candidates if c in df.columns), None)
-supplier_col = next((c for c in ['supplier','supplier_name','vendor'] if c in df.columns), None)
-category_col = next((c for c in ['category','product_category'] if c in df.columns), None)
-date_col = next((c for c in ['date','ds'] if c in df.columns), None)
+# Convert cost to numeric
+df["cost_eur"] = pd.to_numeric(df["cost_eur"], errors="coerce").fillna(0)
 
-if cost_col is None:
-    st.info("No cost column found in data; procurement spend charts require a numeric cost column.")
-else:
-    st.write(f"Using cost column: **{cost_col}**")
+# --------------------------
+# Spend by Supplier
+# --------------------------
+st.header("📦 Spend by Supplier")
 
-# Spend by supplier
-if cost_col and supplier_col:
-    spend = df.groupby(supplier_col)[cost_col].sum().reset_index().sort_values(cost_col, ascending=False)
-    st.subheader("Total Spend by Supplier")
-    fig = px.bar(spend, x=supplier_col, y=cost_col, title="Supplier Spend")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("Supplier or cost column missing - cannot show spend by supplier.")
+spend_supplier = df.groupby("supplier_id")["cost_eur"].sum().sort_values(ascending=False)
+st.bar_chart(spend_supplier)
 
-# Spend by category
-if cost_col and category_col:
-    spend_cat = df.groupby(category_col)[cost_col].sum().reset_index().sort_values(cost_col, ascending=False)
-    st.subheader("Spend by Category")
-    fig2 = px.pie(spend_cat, names=category_col, values=cost_col, title="Spend by Category")
-    st.plotly_chart(fig2, use_container_width=True)
-else:
-    st.info("Category or cost column missing - cannot show spend by category.")
+# --------------------------
+# Spend by Product
+# --------------------------
+st.header("🏷 Spend by Product")
 
-# Monthly spend trend (if date present)
-if cost_col and date_col:
-    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-    monthly = df.groupby(pd.Grouper(key=date_col, freq='M'))[cost_col].sum().reset_index()
-    st.subheader("Monthly Spend Trend")
-    fig3 = px.line(monthly, x=date_col, y=cost_col, title="Monthly Spend")
-    st.plotly_chart(fig3, use_container_width=True)
-else:
-    st.info("Date or cost column missing - cannot show monthly trend.")
+spend_product = df.groupby("product_id")["cost_eur"].sum().sort_values(ascending=False)
+st.bar_chart(spend_product)
+
+# --------------------------
+# Summary Metrics
+# --------------------------
+st.header("📊 Procurement KPIs")
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Spend (€)", f"{df['cost_eur'].sum():,.0f}")
+col2.metric("Unique Suppliers", df["supplier_id"].nunique())
+col3.metric("Unique Products", df["product_id"].nunique())
+
+# --------------------------
+# Full Dataset View
+# --------------------------
+st.header("📄 Procurement Data Table")
+st.dataframe(df)
