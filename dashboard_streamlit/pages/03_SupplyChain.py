@@ -1,15 +1,18 @@
 import streamlit as st
 import pandas as pd
 import os
+import plotly.express as px
 
-st.title("🚚 Supply Chain Overview")
+st.title("📦 Supply Chain Analytics")
 
-# --- Load CSV with correct path ---
-DATA_PATH = os.path.join("..", "..", "data", "deliveries_curated.csv")
+# --- Load CSV robustly ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "..", "..", "data", "deliveries_curated.csv")
+DATA_PATH = os.path.abspath(DATA_PATH)
 
 try:
     df = pd.read_csv(DATA_PATH)
-    st.success("✅ Deliveries CSV loaded successfully")
+    st.success(f"✅ Deliveries CSV loaded successfully from {DATA_PATH}")
 except FileNotFoundError:
     st.error(f"❌ File not found at: {DATA_PATH}")
     st.stop()
@@ -17,14 +20,11 @@ except Exception as e:
     st.error(f"❌ Error loading CSV: {e}")
     st.stop()
 
-# --- Normalize column names ---
+# --- Clean columns ---
 df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-# --- Check required columns ---
-required_cols = [
-    "supplier_id", "product_id", "planned_arrival", "actual_arrival",
-    "lead_time_hours", "cost_eur", "quantity"
-]
+# --- Required columns check ---
+required_cols = ["supplier_id", "product_id", "planned_arrival", "actual_arrival", "lead_time_hours", "quantity"]
 missing_cols = [c for c in required_cols if c not in df.columns]
 if missing_cols:
     st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
@@ -34,73 +34,24 @@ if missing_cols:
 df["planned_arrival"] = pd.to_datetime(df["planned_arrival"], errors="coerce")
 df["actual_arrival"] = pd.to_datetime(df["actual_arrival"], errors="coerce")
 
-# --- Compute delivery delay and on-time flag ---
-df["delay_hours"] = (df["actual_arrival"] - df["planned_arrival"]).dt.total_seconds() / 3600
-df["on_time"] = df["delay_hours"] <= 0
-
-# --------------------------
-# KPI Metrics
-# --------------------------
-st.header("📊 Key Metrics")
-col1, col2, col3 = st.columns(3)
-col1.metric("Average Lead Time (hrs)", f"{df['lead_time_hours'].mean():.1f}")
-col2.metric("Average Delay (hrs)", f"{df['delay_hours'].mean():.1f}")
-col3.metric("On-Time Delivery Rate", f"{df['on_time'].mean()*100:.1f}%")
-
-# --------------------------
-# Lead Time Trend
-# --------------------------
+# --- Lead time trend chart ---
 st.subheader("📈 Lead Time Trend")
-lead_time_trend = df.groupby("planned_arrival")["lead_time_hours"].mean()
-st.line_chart(lead_time_trend)
+lead_time_trend = df.groupby("planned_arrival")["lead_time_hours"].mean().reset_index()
+fig1 = px.line(lead_time_trend, x="planned_arrival", y="lead_time_hours", title="Average Lead Time Over Time")
+st.plotly_chart(fig1, use_container_width=True)
 
-# --------------------------
-# Delivery Delay Trend
-# --------------------------
-st.subheader("⏱ Delivery Delay Trend")
-delay_trend = df.groupby("planned_arrival")["delay_hours"].mean()
-st.line_chart(delay_trend)
+# --- Supplier Performance ---
+st.subheader("🏭 Supplier Lead Time Performance")
+supplier_summary = df.groupby("supplier_id")["lead_time_hours"].mean().sort_values()
+fig2 = px.bar(supplier_summary, x=supplier_summary.index, y="lead_time_hours", labels={"x":"Supplier ID", "lead_time_hours":"Avg Lead Time (hrs)"})
+st.plotly_chart(fig2, use_container_width=True)
 
-# --------------------------
-# Supplier Performance Table
-# --------------------------
-st.subheader("🏭 Supplier Performance")
-supplier_perf = df.groupby("supplier_id").agg({
-    "lead_time_hours": "mean",
-    "delay_hours": "mean",
-    "on_time": "mean",
-    "quantity": "sum",
-    "cost_eur": "sum"
-}).rename(columns={
-    "lead_time_hours": "avg_lead_time_hours",
-    "delay_hours": "avg_delay_hours",
-    "on_time": "on_time_rate",
-    "quantity": "total_quantity",
-    "cost_eur": "total_cost_eur"
-})
-st.dataframe(supplier_perf)
+# --- Product Performance ---
+st.subheader("📦 Product Lead Time Performance")
+product_summary = df.groupby("product_id")["lead_time_hours"].mean().sort_values()
+fig3 = px.bar(product_summary, x=product_summary.index, y="lead_time_hours", labels={"x":"Product ID", "lead_time_hours":"Avg Lead Time (hrs)"})
+st.plotly_chart(fig3, use_container_width=True)
 
-# --------------------------
-# Product Performance Table
-# --------------------------
-st.subheader("📦 Product Performance")
-product_perf = df.groupby("product_id").agg({
-    "lead_time_hours": "mean",
-    "delay_hours": "mean",
-    "on_time": "mean",
-    "quantity": "sum",
-    "cost_eur": "sum"
-}).rename(columns={
-    "lead_time_hours": "avg_lead_time_hours",
-    "delay_hours": "avg_delay_hours",
-    "on_time": "on_time_rate",
-    "quantity": "total_quantity",
-    "cost_eur": "total_cost_eur"
-})
-st.dataframe(product_perf)
-
-# --------------------------
-# Raw Delivery Data
-# --------------------------
+# --- Full dataset ---
 st.subheader("📄 Full Delivery Data")
 st.dataframe(df)
