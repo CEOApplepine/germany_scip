@@ -2,23 +2,28 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.title("🚚 Supply Chain Performance")
+st.title("🚚 Supply Chain Overview")
 
-# --- Load deliveries dataset ---
-DATA_PATH = os.path.join("..", "..", "data", "deliveries_curated.csv")  # two levels up from pages folder
+# --- Load CSV ---
+DATA_PATH = os.path.join("..", "..", "data", "deliveries_curated.csv")
+
 try:
     df = pd.read_csv(DATA_PATH)
+    st.success("✅ Deliveries CSV loaded successfully")
 except FileNotFoundError:
     st.error(f"❌ File not found: {DATA_PATH}")
     st.stop()
+except Exception as e:
+    st.error(f"❌ Error loading CSV: {e}")
+    st.stop()
 
-# --- Normalize column names ---
+# --- Normalize columns ---
 df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-# --- Check required columns ---
+# --- Required columns check ---
 required_cols = [
-    "planned_arrival", "actual_arrival", "lead_time_hours",
-    "supplier_id", "product_id", "quantity", "cost_eur"
+    "supplier_id", "product_id", "planned_arrival", "actual_arrival",
+    "lead_time_hours", "cost_eur", "quantity"
 ]
 missing_cols = [c for c in required_cols if c not in df.columns]
 if missing_cols:
@@ -29,36 +34,28 @@ if missing_cols:
 df["planned_arrival"] = pd.to_datetime(df["planned_arrival"], errors="coerce")
 df["actual_arrival"] = pd.to_datetime(df["actual_arrival"], errors="coerce")
 
-# --- Calculate delay and on-time flag ---
+# --- Compute delivery delays and on-time flag ---
 df["delay_hours"] = (df["actual_arrival"] - df["planned_arrival"]).dt.total_seconds() / 3600
 df["on_time"] = df["delay_hours"] <= 0
 
-# --------------------------
-# KPI Metrics
-# --------------------------
-st.header("📊 Key Supply Chain Metrics")
+# --- KPIs ---
+st.header("📊 Key Metrics")
 col1, col2, col3 = st.columns(3)
-col1.metric("Average Lead Time (hours)", f"{df['lead_time_hours'].mean():.1f}")
-col2.metric("Average Delay (hours)", f"{df['delay_hours'].mean():.1f}")
-col3.metric("On-Time Delivery Rate", f"{df['on_time'].mean() * 100:.1f}%")
+col1.metric("Average Lead Time (hrs)", f"{df['lead_time_hours'].mean():.1f}")
+col2.metric("Average Delay (hrs)", f"{df['delay_hours'].mean():.1f}")
+col3.metric("On-Time Delivery Rate", f"{df['on_time'].mean()*100:.1f}%")
 
-# --------------------------
-# Lead Time Trend
-# --------------------------
+# --- Lead Time Trend ---
 st.subheader("📈 Lead Time Trend")
 lead_time_trend = df.groupby("planned_arrival")["lead_time_hours"].mean()
 st.line_chart(lead_time_trend)
 
-# --------------------------
-# Delivery Delay Trend
-# --------------------------
-st.subheader("⏱ Delay Trend (Planned vs Actual)")
+# --- Delay Trend ---
+st.subheader("⏱ Delivery Delay Trend")
 delay_trend = df.groupby("planned_arrival")["delay_hours"].mean()
 st.line_chart(delay_trend)
 
-# --------------------------
-# Supplier Performance
-# --------------------------
+# --- Supplier Performance Table ---
 st.subheader("🏭 Supplier Performance")
 supplier_perf = df.groupby("supplier_id").agg({
     "lead_time_hours": "mean",
@@ -75,9 +72,7 @@ supplier_perf = df.groupby("supplier_id").agg({
 })
 st.dataframe(supplier_perf)
 
-# --------------------------
-# Product Performance
-# --------------------------
+# --- Product Performance Table ---
 st.subheader("📦 Product Performance")
 product_perf = df.groupby("product_id").agg({
     "lead_time_hours": "mean",
@@ -94,8 +89,6 @@ product_perf = df.groupby("product_id").agg({
 })
 st.dataframe(product_perf)
 
-# --------------------------
-# Raw Data Table
-# --------------------------
+# --- Raw Delivery Data ---
 st.subheader("📄 Full Delivery Data")
 st.dataframe(df)
