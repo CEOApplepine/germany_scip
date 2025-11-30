@@ -4,23 +4,23 @@ import os
 
 st.title("🚚 Supply Chain Overview")
 
-# --- Load CSV ---
+# --- Load CSV with correct path ---
 DATA_PATH = os.path.join("..", "..", "data", "deliveries_curated.csv")
 
 try:
     df = pd.read_csv(DATA_PATH)
     st.success("✅ Deliveries CSV loaded successfully")
 except FileNotFoundError:
-    st.error(f"❌ File not found: {DATA_PATH}")
+    st.error(f"❌ File not found at: {DATA_PATH}")
     st.stop()
 except Exception as e:
     st.error(f"❌ Error loading CSV: {e}")
     st.stop()
 
-# --- Normalize columns ---
+# --- Normalize column names ---
 df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-# --- Required columns check ---
+# --- Check required columns ---
 required_cols = [
     "supplier_id", "product_id", "planned_arrival", "actual_arrival",
     "lead_time_hours", "cost_eur", "quantity"
@@ -34,28 +34,36 @@ if missing_cols:
 df["planned_arrival"] = pd.to_datetime(df["planned_arrival"], errors="coerce")
 df["actual_arrival"] = pd.to_datetime(df["actual_arrival"], errors="coerce")
 
-# --- Compute delivery delays and on-time flag ---
+# --- Compute delivery delay and on-time flag ---
 df["delay_hours"] = (df["actual_arrival"] - df["planned_arrival"]).dt.total_seconds() / 3600
 df["on_time"] = df["delay_hours"] <= 0
 
-# --- KPIs ---
+# --------------------------
+# KPI Metrics
+# --------------------------
 st.header("📊 Key Metrics")
 col1, col2, col3 = st.columns(3)
 col1.metric("Average Lead Time (hrs)", f"{df['lead_time_hours'].mean():.1f}")
 col2.metric("Average Delay (hrs)", f"{df['delay_hours'].mean():.1f}")
 col3.metric("On-Time Delivery Rate", f"{df['on_time'].mean()*100:.1f}%")
 
-# --- Lead Time Trend ---
+# --------------------------
+# Lead Time Trend
+# --------------------------
 st.subheader("📈 Lead Time Trend")
 lead_time_trend = df.groupby("planned_arrival")["lead_time_hours"].mean()
 st.line_chart(lead_time_trend)
 
-# --- Delay Trend ---
+# --------------------------
+# Delivery Delay Trend
+# --------------------------
 st.subheader("⏱ Delivery Delay Trend")
 delay_trend = df.groupby("planned_arrival")["delay_hours"].mean()
 st.line_chart(delay_trend)
 
-# --- Supplier Performance Table ---
+# --------------------------
+# Supplier Performance Table
+# --------------------------
 st.subheader("🏭 Supplier Performance")
 supplier_perf = df.groupby("supplier_id").agg({
     "lead_time_hours": "mean",
@@ -72,7 +80,9 @@ supplier_perf = df.groupby("supplier_id").agg({
 })
 st.dataframe(supplier_perf)
 
-# --- Product Performance Table ---
+# --------------------------
+# Product Performance Table
+# --------------------------
 st.subheader("📦 Product Performance")
 product_perf = df.groupby("product_id").agg({
     "lead_time_hours": "mean",
@@ -89,6 +99,8 @@ product_perf = df.groupby("product_id").agg({
 })
 st.dataframe(product_perf)
 
-# --- Raw Delivery Data ---
+# --------------------------
+# Raw Delivery Data
+# --------------------------
 st.subheader("📄 Full Delivery Data")
 st.dataframe(df)
