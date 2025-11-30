@@ -6,27 +6,31 @@ def run():
     st.title("🚚 Supply Chain Performance")
 
     # --- Load deliveries dataset ---
-    DATA_PATH = os.path.join("..", "data", "deliveries_curated.csv")
+    DATA_PATH = os.path.join("..", "..", "data", "deliveries_curated.csv")
     df = pd.read_csv(DATA_PATH)
 
     # --- Normalize column names ---
     df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-    # --- Validate required columns ---
+    # --- Check required columns ---
     required_cols = [
-        "planned_arrival", "actual_arrival",
-        "lead_time_hours", "supplier_id", "product_id", "quantity"
+        "planned_arrival", "actual_arrival", "lead_time_hours",
+        "supplier_id", "product_id", "quantity", "cost_eur"
     ]
     missing_cols = [c for c in required_cols if c not in df.columns]
     if missing_cols:
         st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
         st.stop()
 
+    # --- Debug info ---
+    st.write("Columns loaded:", df.columns.tolist())
+    st.write("Total rows:", len(df))
+
     # --- Convert dates ---
     df["planned_arrival"] = pd.to_datetime(df["planned_arrival"], errors="coerce")
     df["actual_arrival"] = pd.to_datetime(df["actual_arrival"], errors="coerce")
 
-    # --- Delay calculation ---
+    # --- Calculate delay and on-time flag ---
     df["delay_hours"] = (df["actual_arrival"] - df["planned_arrival"]).dt.total_seconds() / 3600
     df["on_time"] = df["delay_hours"] <= 0
 
@@ -61,12 +65,14 @@ def run():
         "lead_time_hours": "mean",
         "delay_hours": "mean",
         "on_time": "mean",
-        "quantity": "sum"
+        "quantity": "sum",
+        "cost_eur": "sum"
     }).rename(columns={
         "lead_time_hours": "avg_lead_time_hours",
         "delay_hours": "avg_delay_hours",
         "on_time": "on_time_rate",
-        "quantity": "total_quantity"
+        "quantity": "total_quantity",
+        "cost_eur": "total_cost_eur"
     })
     st.dataframe(supplier_perf)
 
@@ -78,17 +84,19 @@ def run():
         "lead_time_hours": "mean",
         "delay_hours": "mean",
         "on_time": "mean",
-        "quantity": "sum"
+        "quantity": "sum",
+        "cost_eur": "sum"
     }).rename(columns={
         "lead_time_hours": "avg_lead_time_hours",
         "delay_hours": "avg_delay_hours",
         "on_time": "on_time_rate",
-        "quantity": "total_quantity"
+        "quantity": "total_quantity",
+        "cost_eur": "total_cost_eur"
     })
     st.dataframe(product_perf)
 
     # --------------------------
-    # Raw Data
+    # Raw Data Table
     # --------------------------
     st.subheader("📄 Full Delivery Data")
     st.dataframe(df)
